@@ -23,6 +23,10 @@ def get_db():
     finally:
         db.close()
 
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Stunning Octo Broccoli API", "status": "online"}
+
 @app.post("/register", response_model=schemas.UserResponse)
 def register(
     username: str = Form(...),
