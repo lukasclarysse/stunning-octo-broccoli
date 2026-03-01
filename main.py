@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Depends, HTTPException, Form, Query
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import models, crud, auth, database, schemas
+from pydantic import BaseModel
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -29,25 +30,35 @@ def read_root():
 
 @app.post("/register", response_model=schemas.UserResponse)
 def register(
-    username: str = Form(...),
-    password: str = Form(...),
-    email: Optional[str] = Form(None),
+    user: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
-    if crud.get_user_by_username(db, username):
+    if crud.get_user_by_username(db, user.username):
         raise HTTPException(status_code=400, detail="Username already taken")
-    user = crud.create_user(db, username=username, password=password, email=email)
-    return user
+
+    new_user = crud.create_user(
+        db,
+        username=user.username,
+        password=user.password,
+        email=user.email
+    )
+
+    return new_user
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 @app.post("/login", response_model=schemas.UserResponse)
 def login(
-    username: str = Form(...),
-    password: str = Form(...),
+    credentials: LoginRequest,
     db: Session = Depends(get_db)
 ):
-    user = crud.get_user_by_username(db, username)
-    if not user or not auth.verify_password(password, user.password):
+    user = crud.get_user_by_username(db, credentials.username)
+
+    if not user or not auth.verify_password(credentials.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
     return user
 
 @app.get("/getuserbyid", response_model=schemas.UserResponse)
