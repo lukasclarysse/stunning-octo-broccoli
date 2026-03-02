@@ -1,13 +1,18 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import models, crud, auth, database, schemas
 from pydantic import BaseModel
+import os
+import shutil
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
+
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,3 +82,37 @@ def read_all_users(db: Session = Depends(get_db)):
     if not users:
         raise HTTPException(status_code=404, detail="No users found")
     return users
+
+@app.post("/users/{user_id}/upload-profile-picture")
+def upload_profile_picture(
+    user_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    user = crud.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    upload_dir = "uploads/profile_pictures"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    file_extension = file.filename.split(".")[-1].lower()
+    allowed_extensions = {"jpg", "jpeg", "png", "webp"}
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(status_code=400, detail="Invalid image format")
+
+    file_name = f"user_{user_id}.{file_extension}"
+    file_path = os.path.join(upload_dir, file_name)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    user.profile_picture = f"/uploads/profile_pictures/{file_name}"
+    db.commit()
+    db.refresh(user)
+
+    return {"message": "Profile picture uploaded successfully"}
