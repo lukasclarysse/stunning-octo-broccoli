@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stunning Octo Broccoli Demo</title>
+</head>
+<body>
+<h1>Stunning Octo Broccoli Demo</h1>
+<div id="auth-section">
+    <h2>Login</h2>
+    <form id="loginForm">
+        <input type="text" id="login-username" placeholder="Username" required>
+        <input type="password" id="login-password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+    <h2>Register</h2>
+    <form id="registerForm">
+        <input type="text" id="reg-username" placeholder="Username" required>
+        <input type="password" id="reg-password" placeholder="Password" required>
+        <input type="email" id="reg-email" placeholder="Email">
+        <button type="submit">Register</button>
+    </form>
+    <div id="auth-msg"></div>
+</div>
+
+<div id="dashboard" style="display:none;">
+    <h2>Dashboard</h2>
+    <p id="welcome-msg"></p>
+    <section>
+        <h3>Profile Picture</h3>
+        <img id="profile-img" src="" alt="Profile Picture" width="150"><br>
+        <input type="file" id="profileFile">
+        <button id="uploadBtn">Upload Picture</button>
+        <div id="uploadMsg"></div>
+    </section>
+    <section>
+        <h3>Profile Info</h3>
+        <p><strong>Username:</strong> <span id="p-username"></span></p>
+        <p><strong>Email:</strong> <span id="p-email"></span></p>
+        <p><strong>User ID:</strong> <span id="p-id"></span></p>
+    </section>
+    <button id="logoutBtn">Logout</button>
+</div>
+<script>
+const API_URL = "http://127.0.0.1:8000";
+
+// ------------------- AUTH -------------------
+async function handleAuth(endpoint, payload) {
+    const msg = document.getElementById('auth-msg');
+    try {
+        const res = await fetch(`${API_URL}/${endpoint}`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            msg.innerText = data.detail || "Error";
+            return;
+        }
+        if (endpoint === "login") {
+            localStorage.setItem('userId', data.id);
+            localStorage.setItem('username', data.username);
+            showDashboard();
+        }
+        if (endpoint === "register") {
+            msg.innerText = "Account created! You can now login.";
+        }
+    } catch(e){ msg.innerText = "Server unreachable"; }
+}
+
+document.getElementById('loginForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    handleAuth("login", {
+        username: document.getElementById('login-username').value,
+        password: document.getElementById('login-password').value
+    });
+});
+document.getElementById('registerForm').addEventListener('submit', e=>{
+    e.preventDefault();
+    handleAuth("register", {
+        username: document.getElementById('reg-username').value,
+        password: document.getElementById('reg-password').value,
+        email: document.getElementById('reg-email').value || null
+    });
+});
+
+// ------------------- DASHBOARD -------------------
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    localStorage.clear();
+    document.getElementById('dashboard').style.display="none";
+    document.getElementById('auth-section').style.display="block";
+});
+
+async function showDashboard() {
+    document.getElementById('auth-section').style.display="none";
+    document.getElementById('dashboard').style.display="block";
+
+    const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
+    document.getElementById('welcome-msg').innerText = `Welcome, ${username}!`;
+
+    // Load profile info
+    try {
+        const res = await fetch(`${API_URL}/getuserbyid?user_id=${userId}`);
+        const data = await res.json();
+        if(res.ok){
+            document.getElementById('p-username').innerText = data.username;
+            document.getElementById('p-email').innerText = data.email || 'Not provided';
+            document.getElementById('p-id').innerText = data.id;
+            if(data.profile_picture) document.getElementById('profile-img').src = `${API_URL}${data.profile_picture}`;
+        }
+    } catch(e){ console.log("Failed to load profile info"); }
+}
+
+// ------------------- UPLOAD PROFILE PICTURE -------------------
+document.getElementById('uploadBtn').addEventListener('click', async ()=>{
+    const userId = localStorage.getItem('userId');
+    const fileInput = document.getElementById('profileFile');
+    const uploadMsg = document.getElementById('uploadMsg');
+
+    if(!fileInput.files.length) return alert("Select a file");
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    try {
+        const res = await fetch(`${API_URL}/users/${userId}/upload-profile-picture`, {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+        if(!res.ok){ uploadMsg.innerText=data.detail||"Error"; return; }
+        uploadMsg.innerText = data.message;
+        document.getElementById('profile-img').src = URL.createObjectURL(fileInput.files[0]);
+    } catch(e){ uploadMsg.innerText="Server unreachable"; }
+});
+</script>
+</body>
+</html>
