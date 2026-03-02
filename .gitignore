@@ -2,3 +2,4 @@
 __pycache__/
 .venv/
 profile_pictures/
+.vscode/
