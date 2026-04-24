@@ -10,7 +10,7 @@ import shutil
 
 models.Base.metadata.create_all(bind=database.engine)
 
-app = FastAPI()
+app = FastAPI(docs_url="/geheim-6782-docs")
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
@@ -68,7 +68,7 @@ def login(
 
 @app.get("/getuserbyid", response_model=schemas.UserResponse)
 def read_user(
-    user_id: int = Query(..., description="ID of the user"),
+    user_id: str = Query(..., description="ID of the user"),
     db: Session = Depends(get_db)
 ):
     user = crud.get_user_by_id(db, user_id)
@@ -85,7 +85,7 @@ def read_all_users(db: Session = Depends(get_db)):
 
 @app.post("/users/{user_id}/upload-profile-picture")
 def upload_profile_picture(
-    user_id: int,
+    user_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):

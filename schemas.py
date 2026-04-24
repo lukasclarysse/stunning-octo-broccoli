@@ -7,7 +7,7 @@ class UserCreate(BaseModel):
     email: Optional[str] = None
 
 class UserResponse(BaseModel):
-    id: int
+    id: str
     username: str
     email: Optional[str] = None
     profile_picture: Optional[str] = None
